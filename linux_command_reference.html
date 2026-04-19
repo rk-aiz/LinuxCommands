@@ -1,0 +1,329 @@
+
+<style>
+h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);color:var(--color-text-primary)}
+.wrap{padding:1rem 0}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
+.controls input{flex:1;min-width:160px;padding:6px 10px;font-size:14px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.tag-btn{padding:4px 12px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:20px;background:transparent;color:var(--color-text-secondary);cursor:pointer;transition:all 0.15s}
+.tag-btn:hover{background:var(--color-background-secondary)}
+.tag-btn.active{background:#1D9E75;border-color:#1D9E75;color:#fff}
+.level-btns{display:flex;gap:6px;margin-bottom:1rem}
+.lvl-btn{padding:4px 14px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:20px;background:transparent;color:var(--color-text-secondary);cursor:pointer;transition:all 0.15s}
+.lvl-btn:hover{background:var(--color-background-secondary)}
+.lvl-btn.active{background:#378ADD;border-color:#378ADD;color:#fff}
+.stats{font-size:12px;color:var(--color-text-tertiary);margin-bottom:0.75rem}
+.cmd-list{display:flex;flex-direction:column;gap:6px}
+.cmd-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:12px 16px;cursor:pointer;transition:border-color 0.15s}
+.cmd-card:hover{border-color:var(--color-border-secondary)}
+.cmd-card.open{border-color:var(--color-border-primary)}
+.cmd-header{display:flex;align-items:center;gap:10px}
+.cmd-name{font-family:var(--font-mono);font-size:15px;font-weight:500;color:#185FA5}
+.cmd-desc{font-size:13px;color:var(--color-text-secondary);flex:1}
+.badges{display:flex;gap:5px;align-items:center}
+.badge{font-size:10px;padding:2px 8px;border-radius:12px;font-weight:500}
+.badge-cat{background:#E1F5EE;color:#0F6E56}
+.badge-beg{background:#E6F1FB;color:#185FA5}
+.badge-adv{background:#FAEEDA;color:#854F0B}
+.badge-both{background:#EEEDFE;color:#3C3489}
+.chevron{margin-left:auto;font-size:11px;color:var(--color-text-tertiary);transition:transform 0.2s}
+.cmd-card.open .chevron{transform:rotate(180deg)}
+.cmd-detail{display:none;margin-top:12px;border-top:0.5px solid var(--color-border-tertiary);padding-top:12px}
+.cmd-card.open .cmd-detail{display:block}
+.examples{display:flex;flex-direction:column;gap:6px}
+.example-block{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:8px 12px}
+.example-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
+.example-code{font-family:var(--font-mono);font-size:13px;color:#185FA5;word-break:break-all}
+.example-note{font-size:12px;color:var(--color-text-secondary);margin-top:4px}
+.options-table{width:100%;font-size:12px;border-collapse:collapse;margin-top:10px}
+.options-table th{text-align:left;color:var(--color-text-tertiary);font-weight:500;padding:3px 6px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.options-table td{padding:3px 6px;vertical-align:top}
+.options-table td:first-child{font-family:var(--font-mono);color:#185FA5;white-space:nowrap}
+.options-table tr:hover td{background:var(--color-background-secondary)}
+.no-result{text-align:center;padding:2rem;color:var(--color-text-tertiary);font-size:14px}
+</style>
+
+<h2 class="sr-only">Linuxコマンドリファレンス — 検索・フィルター付き</h2>
+<div class="wrap">
+<div class="controls">
+  <input type="text" id="search" placeholder="コマンド名や説明で検索..." oninput="render()">
+</div>
+<div class="filters" id="cat-filters"></div>
+<div style="margin:8px 0 4px;font-size:11px;color:var(--color-text-tertiary)">レベル</div>
+<div class="level-btns">
+  <button class="lvl-btn active" data-lvl="all" onclick="setLevel(this)">すべて</button>
+  <button class="lvl-btn" data-lvl="beginner" onclick="setLevel(this)">初級</button>
+  <button class="lvl-btn" data-lvl="advanced" onclick="setLevel(this)">中上級</button>
+</div>
+<div class="stats" id="stats"></div>
+<div class="cmd-list" id="list"></div>
+</div>
+
+<script>
+const data = [
+  {name:"ls",cat:"ファイル操作",level:"beginner",desc:"ディレクトリの内容を一覧表示",
+   examples:[
+    {label:"基本",code:"ls -la",note:"-l で詳細表示、-a で隠しファイルも表示"},
+    {label:"人が読みやすいサイズ",code:"ls -lh /var/log",note:"-h でKB/MB単位で表示"},
+    {label:"更新日時順",code:"ls -lt",note:"-t で新しい順にソート"}
+   ],
+   opts:[["−l","詳細(long)形式"],["−a","隠しファイル含む"],["−h","サイズを人間が読める形式"],["−t","時刻順"],["−r","逆順"]]},
+
+  {name:"cd",cat:"ファイル操作",level:"beginner",desc:"ディレクトリの移動",
+   examples:[
+    {label:"ホームへ",code:"cd ~",note:"どこからでもホームに戻る"},
+    {label:"一つ上",code:"cd ..",note:"親ディレクトリへ"},
+    {label:"前のディレクトリ",code:"cd -",note:"直前のディレクトリに戻る"}
+   ],
+   opts:[["~","ホームディレクトリ"],["..","親ディレクトリ"],["-","前のディレクトリ"]]},
+
+  {name:"cp",cat:"ファイル操作",level:"beginner",desc:"ファイル・ディレクトリのコピー",
+   examples:[
+    {label:"ファイルをコピー",code:"cp file.txt backup.txt",note:""},
+    {label:"ディレクトリを再帰コピー",code:"cp -r src/ dst/",note:"-r でディレクトリごとコピー"},
+    {label:"上書き前に確認",code:"cp -i file.txt dest/",note:"-i で上書き時に確認を促す"}
+   ],
+   opts:[["−r","再帰コピー(ディレクトリ)"],["−i","上書き確認"],["−p","パーミッション/タイムスタンプ保持"],["−v","進捗を表示"]]},
+
+  {name:"mv",cat:"ファイル操作",level:"beginner",desc:"ファイルの移動・リネーム",
+   examples:[
+    {label:"リネーム",code:"mv old.txt new.txt",note:"同ディレクトリ内で使えばリネームになる"},
+    {label:"ディレクトリへ移動",code:"mv *.log /var/logs/",note:"グロブで複数ファイルまとめて移動"},
+    {label:"上書き確認",code:"mv -i file.txt dest/",note:"-i で安全に"}
+   ],
+   opts:[["−i","上書き確認"],["−n","上書きしない"],["−v","詳細表示"]]},
+
+  {name:"rm",cat:"ファイル操作",level:"beginner",desc:"ファイル・ディレクトリの削除",
+   examples:[
+    {label:"ファイル削除",code:"rm file.txt",note:""},
+    {label:"ディレクトリを再帰削除",code:"rm -rf dir/",note:"⚠ -f は確認なし。慎重に"},
+    {label:"確認しながら削除",code:"rm -i *.log",note:"-i で1つずつ確認"}
+   ],
+   opts:[["−r","再帰削除"],["−f","強制削除(確認なし)"],["−i","削除前に確認"],["−v","詳細表示"]]},
+
+  {name:"chmod",cat:"パーミッション",level:"beginner",desc:"ファイルのパーミッション(権限)を変更",
+   examples:[
+    {label:"実行権限を付与(シンボル)",code:"chmod +x script.sh",note:"所有者・グループ・他全員に実行権限"},
+    {label:"数値指定",code:"chmod 755 script.sh",note:"rwxr-xr-x: 所有者=読書実行、他=読実行"},
+    {label:"再帰変更",code:"chmod -R 644 /var/www/html/",note:"-R でディレクトリ以下すべてに適用"}
+   ],
+   opts:[["−R","再帰適用"],["u/g/o/a","user/group/other/all"],["+ / −","権限追加/削除"],["r/w/x","読/書/実行"]]},
+
+  {name:"chown",cat:"パーミッション",level:"advanced",desc:"ファイルの所有者・グループを変更",
+   examples:[
+    {label:"所有者変更",code:"chown alice file.txt",note:""},
+    {label:"所有者とグループを同時変更",code:"chown alice:developers file.txt",note:"user:group の形式"},
+    {label:"再帰変更",code:"sudo chown -R www-data:www-data /var/www/",note:"Webサーバーのファイルに多用される"}
+   ],
+   opts:[["−R","再帰適用"],["user:group","所有者:グループ"],["−v","変更内容を表示"]]},
+
+  {name:"find",cat:"検索",level:"advanced",desc:"条件を指定してファイルを検索",
+   examples:[
+    {label:"名前で検索",code:"find /home -name '*.txt'",note:""},
+    {label:"7日以内に変更されたファイル",code:"find . -mtime -7",note:"-mtime で更新日時フィルタ"},
+    {label:"大きいファイルを探す",code:"find / -size +100M -type f",note:"+100M は100MB以上"},
+    {label:"検索結果に処理を実行",code:"find . -name '*.log' -exec rm {} \\;",note:"-exec で見つかったファイルにコマンド実行"}
+   ],
+   opts:[["−name","ファイル名パターン"],["−type f/d","ファイル/ディレクトリ"],["−mtime N","N日前に変更"],["−size","サイズ条件"],["−exec","コマンド実行"]]},
+
+  {name:"grep",cat:"検索",level:"beginner",desc:"テキストパターンをファイルや入力から検索",
+   examples:[
+    {label:"基本検索",code:"grep 'error' /var/log/syslog",note:""},
+    {label:"再帰検索",code:"grep -r 'TODO' ./src/",note:"-r でディレクトリ内を全検索"},
+    {label:"行番号付き",code:"grep -n 'config' settings.conf",note:"-n で一致行番号を表示"},
+    {label:"パイプと組み合わせ",code:"ps aux | grep nginx",note:"プロセス一覧からnginxを絞り込む"}
+   ],
+   opts:[["−r","再帰検索"],["−n","行番号表示"],["−i","大文字小文字無視"],["−v","マッチしない行を表示"],["−E","拡張正規表現(ERE)"]]},
+
+  {name:"nano",cat:"テキスト編集",level:"beginner",desc:"シンプルなターミナルテキストエディタ",
+   examples:[
+    {label:"ファイルを開く",code:"nano /etc/hosts",note:""},
+    {label:"新規作成",code:"nano newfile.txt",note:"存在しないファイル名で起動すると新規作成"},
+    {label:"root権限で編集",code:"sudo nano /etc/nginx/nginx.conf",note:"設定ファイルの編集に頻出"}
+   ],
+   opts:[["Ctrl+O","保存(Write Out)"],["Ctrl+X","終了"],["Ctrl+W","検索"],["Ctrl+K","行を切り取り"],["Ctrl+U","貼り付け"],["Ctrl+G","ヘルプ"]]},
+
+  {name:"cat",cat:"テキスト編集",level:"beginner",desc:"ファイルの内容を表示・結合",
+   examples:[
+    {label:"内容表示",code:"cat /etc/os-release",note:""},
+    {label:"行番号付きで表示",code:"cat -n file.txt",note:"-n で行番号"},
+    {label:"ファイルを結合",code:"cat file1.txt file2.txt > merged.txt",note:"複数ファイルをリダイレクトで結合"}
+   ],
+   opts:[["−n","行番号表示"],["−A","制御文字を可視化"],["−s","連続する空行を1行に"]]},
+
+  {name:"less",cat:"テキスト編集",level:"beginner",desc:"ファイルをページ送りで閲覧(読み取り専用)",
+   examples:[
+    {label:"ファイルを閲覧",code:"less /var/log/syslog",note:""},
+    {label:"パイプと組み合わせ",code:"dmesg | less",note:"長い出力をページ送りで確認"},
+    {label:"検索",code:"less +/error /var/log/auth.log",note:"開いた状態でも / キーで検索可能"}
+   ],
+   opts:[["Space / b","次ページ/前ページ"],["/ <word>","検索"],["n / N","次/前のマッチ"],["q","終了"],["G","末尾へ移動"]]},
+
+  {name:"ps",cat:"プロセス管理",level:"beginner",desc:"実行中のプロセスを一覧表示",
+   examples:[
+    {label:"全プロセスを表示",code:"ps aux",note:"a=全ユーザー u=ユーザー形式 x=制御端末なしも"},
+    {label:"プロセスをgrep",code:"ps aux | grep python",note:"特定のプロセスを絞り込む"},
+    {label:"ツリー表示",code:"ps axjf",note:"親子関係を確認したいとき"}
+   ],
+   opts:[["a","全ユーザーのプロセス"],["u","ユーザー形式で表示"],["x","端末なしプロセスも"],["f","フォレスト(ツリー)形式"]]},
+
+  {name:"kill",cat:"プロセス管理",level:"advanced",desc:"プロセスにシグナルを送信(終了させるなど)",
+   examples:[
+    {label:"正常終了",code:"kill 1234",note:"PIDを指定。デフォルトはSIGTERM(15)"},
+    {label:"強制終了",code:"kill -9 1234",note:"SIGKILL: プロセスを強制的に終了"},
+    {label:"プロセス名で終了",code:"pkill nginx",note:"pkill はプロセス名で指定できる"}
+   ],
+   opts:[["−9 / SIGKILL","強制終了"],["−15 / SIGTERM","正常終了(デフォルト)"],["−1 / SIGHUP","設定ファイルの再読み込みに使われることも"]]},
+
+  {name:"top",cat:"プロセス管理",level:"beginner",desc:"CPU・メモリ使用状況をリアルタイム表示",
+   examples:[
+    {label:"起動",code:"top",note:"q で終了、k でプロセス終了"},
+    {label:"ユーザーでフィルタ",code:"top -u alice",note:"特定ユーザーのプロセスのみ表示"},
+    {label:"htop(拡張版)",code:"htop",note:"カラー表示・操作性向上。別途インストール要"}
+   ],
+   opts:[["q","終了"],["k","プロセスkill"],["M","メモリ使用量順"],["P","CPU使用率順"],["1","CPUコア個別表示"]]},
+
+  {name:"df",cat:"ディスク・ネットワーク",level:"beginner",desc:"ディスクの使用量を表示",
+   examples:[
+    {label:"人間が読みやすい形式",code:"df -h",note:"GB/MBで表示"},
+    {label:"特定のディレクトリ",code:"df -h /var",note:""},
+    {label:"ファイルシステムタイプ付き",code:"df -hT",note:"-T でファイルシステム種別も表示"}
+   ],
+   opts:[["−h","KB/MB/GB単位"],["−T","ファイルシステム種別"],["−i","inode使用量を表示"]]},
+
+  {name:"du",cat:"ディスク・ネットワーク",level:"advanced",desc:"ディレクトリ・ファイルのサイズを計測",
+   examples:[
+    {label:"現在のディレクトリ",code:"du -sh .",note:"-s で合計のみ -h で人間向け単位"},
+    {label:"サブディレクトリの内訳",code:"du -h --max-depth=1 /var",note:"1階層下のサイズを一覧"},
+    {label:"大きい順にソート",code:"du -h /home | sort -rh | head -20",note:"sort -rh で大きい順"}
+   ],
+   opts:[["−s","合計のみ"],["−h","人間向け単位"],["−−max-depth=N","深さ制限"],["−a","ファイル単位で表示"]]},
+
+  {name:"ssh",cat:"ディスク・ネットワーク",level:"beginner",desc:"リモートサーバーへのセキュアな接続",
+   examples:[
+    {label:"基本接続",code:"ssh user@192.168.1.10",note:""},
+    {label:"ポート指定",code:"ssh -p 2222 user@server.example.com",note:"-p でポート番号を指定"},
+    {label:"鍵ファイルを指定",code:"ssh -i ~/.ssh/mykey.pem user@host",note:"秘密鍵を明示的に指定"}
+   ],
+   opts:[["−p","ポート指定"],["−i","秘密鍵ファイル"],["−L","ローカルポートフォワード"],["−v","デバッグ出力"]]},
+
+  {name:"scp",cat:"ディスク・ネットワーク",level:"advanced",desc:"SSH経由でファイルを安全にコピー",
+   examples:[
+    {label:"ローカル→リモート",code:"scp file.txt user@host:/tmp/",note:""},
+    {label:"リモート→ローカル",code:"scp user@host:/var/log/app.log .",note:""},
+    {label:"ディレクトリごと",code:"scp -r ./project user@host:~/",note:"-r で再帰コピー"}
+   ],
+   opts:[["−r","再帰コピー"],["−P","ポート指定(大文字)"],["−i","秘密鍵ファイル"],["−p","タイムスタンプ保持"]]},
+
+  {name:"curl",cat:"ディスク・ネットワーク",level:"advanced",desc:"HTTPリクエストやファイルダウンロードを行う",
+   examples:[
+    {label:"GETリクエスト",code:"curl https://example.com",note:""},
+    {label:"ファイルのダウンロード",code:"curl -O https://example.com/file.zip",note:"-O で元のファイル名で保存"},
+    {label:"APIのPOSTリクエスト",code:"curl -X POST -H 'Content-Type: application/json' -d '{\"key\":\"val\"}' https://api.example.com/",note:"APIテストに頻用"}
+   ],
+   opts:[["−O","元のファイル名で保存"],["−o","出力先ファイル指定"],["−X","HTTPメソッド指定"],["−H","ヘッダー追加"],["−d","リクエストボディ"],["−I","ヘッダーのみ取得"],["−s","サイレントモード"]]},
+
+  {name:"tar",cat:"アーカイブ",level:"advanced",desc:"ファイルのアーカイブ(圧縮・展開)",
+   examples:[
+    {label:"gz圧縮アーカイブ作成",code:"tar -czvf archive.tar.gz ./dir/",note:"-c 作成 -z gzip -v 詳細 -f ファイル名"},
+    {label:"展開",code:"tar -xzvf archive.tar.gz",note:"-x 展開"},
+    {label:"内容確認",code:"tar -tzvf archive.tar.gz",note:"-t 一覧表示(展開しない)"}
+   ],
+   opts:[["−c","アーカイブ作成"],["−x","展開"],["−t","内容一覧"],["−z","gzip圧縮"],["−j","bzip2圧縮"],["−v","詳細表示"],["−f","ファイル名指定"]]},
+
+  {name:"ln",cat:"ファイル操作",level:"advanced",desc:"ファイルのリンク(ハードリンク・シンボリックリンク)を作成",
+   examples:[
+    {label:"シンボリックリンク",code:"ln -s /usr/local/bin/python3 /usr/bin/python",note:"パスのエイリアスとして使う"},
+    {label:"ハードリンク",code:"ln file.txt hardlink.txt",note:"同一inode。削除してもデータが残る"}
+   ],
+   opts:[["−s","シンボリックリンク"],["−f","既存ファイルを上書き"],["−n","リンク先がディレクトリでも辿らない"]]},
+
+  {name:"systemctl",cat:"システム管理",level:"advanced",desc:"systemdサービスの管理(起動・停止・自動起動設定など)",
+   examples:[
+    {label:"サービスの状態確認",code:"systemctl status nginx",note:""},
+    {label:"起動・停止・再起動",code:"sudo systemctl restart nginx",note:"start / stop / restart"},
+    {label:"自動起動を有効化",code:"sudo systemctl enable nginx",note:"disable で無効化"},
+    {label:"全サービスの一覧",code:"systemctl list-units --type=service",note:""}
+   ],
+   opts:[["start/stop","起動/停止"],["restart/reload","再起動/設定再読み込み"],["enable/disable","自動起動 有効/無効"],["status","状態確認"],["list-units","ユニット一覧"]]},
+
+  {name:"journalctl",cat:"システム管理",level:"advanced",desc:"systemdのログ(ジャーナル)を閲覧",
+   examples:[
+    {label:"直近のログ",code:"journalctl -n 50",note:"-n で表示行数を指定"},
+    {label:"サービスのログ",code:"journalctl -u nginx",note:"-u でユニット絞り込み"},
+    {label:"リアルタイムで追跡",code:"journalctl -f",note:"-f でtail -fのように追跡"},
+    {label:"時刻範囲指定",code:"journalctl --since '2024-01-01' --until '2024-01-02'",note:""}
+   ],
+   opts:[["−u","ユニット(サービス)絞り込み"],["−n","表示行数"],["−f","リアルタイム追跡"],["−−since/--until","時刻範囲"]]},
+
+  {name:"crontab",cat:"システム管理",level:"advanced",desc:"定期実行タスク(cronジョブ)の管理",
+   examples:[
+    {label:"cronを編集",code:"crontab -e",note:""},
+    {label:"毎日午前2時にバックアップ",code:"0 2 * * * /usr/local/bin/backup.sh",note:"分 時 日 月 曜日"},
+    {label:"cronの一覧確認",code:"crontab -l",note:""}
+   ],
+   opts:[["−e","編集"],["−l","一覧表示"],["−r","全削除(注意)"],["* * * * *","分 時 日 月 曜日"]]},
+];
+
+const cats = [...new Set(data.map(d=>d.cat))];
+let activeCat = "all";
+let activeLevel = "all";
+
+const catWrap = document.getElementById("cat-filters");
+catWrap.innerHTML = `<button class="tag-btn active" data-cat="all" onclick="setCat(this)">すべて</button>` +
+  cats.map(c=>`<button class="tag-btn" data-cat="${c}" onclick="setCat(this)">${c}</button>`).join("");
+
+function setCat(btn){
+  document.querySelectorAll(".tag-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active"); activeCat = btn.dataset.cat; render();
+}
+function setLevel(btn){
+  document.querySelectorAll(".lvl-btn").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active"); activeLevel = btn.dataset.lvl; render();
+}
+
+function toggle(el){
+  el.classList.toggle("open");
+}
+
+function render(){
+  const q = document.getElementById("search").value.toLowerCase();
+  let items = data.filter(d=>{
+    const matchCat = activeCat==="all" || d.cat===activeCat;
+    const matchLvl = activeLevel==="all" || d.level===activeLevel;
+    const matchQ = !q || d.name.includes(q) || d.desc.toLowerCase().includes(q) || d.cat.toLowerCase().includes(q);
+    return matchCat && matchLvl && matchQ;
+  });
+  document.getElementById("stats").textContent = `${items.length} コマンド表示中`;
+  if(!items.length){
+    document.getElementById("list").innerHTML = `<div class="no-result">一致するコマンドが見つかりませんでした</div>`;
+    return;
+  }
+  document.getElementById("list").innerHTML = items.map(d=>{
+    const lvlLabel = d.level==="beginner"?"初級":"中上級";
+    const lvlCls = d.level==="beginner"?"badge-beg":"badge-adv";
+    const opts = d.opts.map(o=>`<tr><td>${o[0]}</td><td style="color:var(--color-text-secondary)">${o[1]}</td></tr>`).join("");
+    const exs = d.examples.map(e=>`<div class="example-block"><div class="example-label">${e.label}</div><div class="example-code">${e.code}</div>${e.note?`<div class="example-note">${e.note}</div>`:""}</div>`).join("");
+    return `<div class="cmd-card" onclick="this.classList.toggle('open')">
+      <div class="cmd-header">
+        <span class="cmd-name">${d.name}</span>
+        <span class="cmd-desc">${d.desc}</span>
+        <div class="badges">
+          <span class="badge badge-cat">${d.cat}</span>
+          <span class="badge ${lvlCls}">${lvlLabel}</span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="cmd-detail">
+        <div style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:8px">使用例</div>
+        <div class="examples">${exs}</div>
+        <div style="font-size:12px;color:var(--color-text-tertiary);margin:12px 0 6px">主なオプション</div>
+        <table class="options-table"><thead><tr><th>オプション</th><th>意味</th></tr></thead><tbody>${opts}</tbody></table>
+      </div>
+    </div>`;
+  }).join("");
+}
+render();
+</script>
